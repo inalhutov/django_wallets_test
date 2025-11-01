@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>💰 Wallet App</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background-color: #f6f8fa;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 50px;
+    }
+    .container {
+      width: 400px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      padding: 20px 30px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .btn-blue { background-color: #3b82f6; }
+    .btn-blue:hover { background-color: #2563eb; }
+    .btn-green { background-color: #16a34a; }
+    .btn-green:hover { background-color: #15803d; }
+    .btn-red { background-color: #dc2626; }
+    .btn-red:hover { background-color: #b91c1c; }
+    .btn-gray { background-color: #6b7280; }
+    .btn-gray:hover { background-color: #4b5563; }
+    .message {
+      margin-top: 15px;
+      font-size: 15px;
+      color: #333;
+      text-align: center;
+    }
+    .balance {
+      text-align: center;
+      font-weight: bold;
+      margin: 10px 0;
+      font-size: 18px;
+      display: none; /* Скрываем баланс по умолчанию */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💰 Wallet App</h1>
+
+    <div id="step-user">
+      <input id="username" type="text" placeholder="Введите имя пользователя" />
+      <button class="btn-blue" onclick="createUser()">Создать пользователя</button>
+    </div>
+
+    <div id="step-wallet" style="display:none;">
+      <p id="greeting"></p>
+      <button class="btn-green" onclick="createWallet()">Создать кошелёк</button>
+    </div>
+
+    <div id="step-operations" style="display:none;">
+      <div class="balance" id="balanceBlock">Баланс: <span id="balance">0.00</span> ₽</div>
+      <input id="amount" type="number" placeholder="Введите сумму" />
+      <button class="btn-blue" onclick="makeOperation('DEPOSIT')">Пополнить</button>
+      <button class="btn-red" onclick="makeOperation('WITHDRAW')">Снять</button>
+      <button class="btn-gray" onclick="showBalance()">Показать баланс</button>
+    </div>
+
+    <div id="message" class="message"></div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8000/api/v1";
+    let userId = null;
+    let walletId = null;
+
+    function showMessage(text) {
+      document.getElementById("message").innerText = text;
+    }
+
+    async function createUser() {
+      const name = document.getElementById("username").value.trim();
+      if (!name) return showMessage("Введите имя");
+
+      const res = await fetch("http://localhost:8000/api/v1/users/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        userId = data.id;
+        document.getElementById("step-user").style.display = "none";
+        document.getElementById("step-wallet").style.display = "block";
+        document.getElementById("greeting").innerText = `Привет, ${data.name}!`;
+        showMessage("Пользователь создан успешно ✅");
+      } else {
+        showMessage(data.detail || "Ошибка создания пользователя");
+      }
+    }
+
+    async function createWallet() {
+      const res = await fetch(`${API_BASE}/users/${userId}/wallets/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        walletId = data.id;
+        document.getElementById("step-wallet").style.display = "none";
+        document.getElementById("step-operations").style.display = "block";
+        document.getElementById("balance").innerText = data.balance;
+        showMessage("Кошелёк успешно создан ✅");
+      } else {
+        showMessage("Ошибка при создании кошелька");
+      }
+    }
+
+    async function makeOperation(type) {
+      if (!walletId) return showMessage("Нет кошелька");
+      const amount = parseFloat(document.getElementById("amount").value);
+      if (!amount || amount <= 0) return showMessage("Введите корректную сумму");
+
+      const res = await fetch(`${API_BASE}/wallets/${walletId}/operation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation_type: type, amount }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showMessage(`${type === "DEPOSIT" ? "Пополнение" : "Снятие"} успешно`);
+        // Скрываем баланс после операции
+        document.getElementById("balanceBlock").style.display = "none";
+      } else {
+        showMessage(data.detail || "Ошибка операции");
+      }
+    }
+
+    async function showBalance() {
+      if (!walletId) return;
+      const res = await fetch(`${API_BASE}/wallets/${walletId}/`);
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById("balance").innerText = data.balance;
+        document.getElementById("balanceBlock").style.display = "block";
+      }
+    }
+  </script>
+</body>
+</html>
